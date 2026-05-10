@@ -11,7 +11,7 @@ import (
 
 func ExampleNew() {
 	tr, err := traceroute.New(traceroute.Options{
-		MaxHops:       30,
+		MaxHops:       64,
 		QueriesPerHop: 3,
 		Timeout:       2 * time.Second,
 	})

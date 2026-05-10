@@ -5,11 +5,14 @@ import "testing"
 func TestOptionsNormalize(t *testing.T) {
 	opts := Options{}.Normalize()
 
-	if opts.MaxHops != 30 {
-		t.Fatalf("MaxHops = %d, want 30", opts.MaxHops)
+	if opts.MaxHops != 64 {
+		t.Fatalf("MaxHops = %d, want 64", opts.MaxHops)
 	}
 	if opts.QueriesPerHop != 3 {
 		t.Fatalf("QueriesPerHop = %d, want 3", opts.QueriesPerHop)
+	}
+	if opts.PacketSize != 48 {
+		t.Fatalf("PacketSize = %d, want 48", opts.PacketSize)
 	}
 }
 

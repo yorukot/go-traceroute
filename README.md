@@ -8,7 +8,7 @@ classic traceroute output is left to the caller.
 
 ```go
 tr, err := traceroute.New(traceroute.Options{
-    MaxHops:       30,
+    MaxHops:       64,
     QueriesPerHop: 3,
     Timeout:       2 * time.Second,
 })
@@ -33,7 +33,7 @@ or capabilities for your platform, otherwise traces return `ErrPermission`.
 
 ## Examples
 
-See `examples/basic` and `examples/stream`.
+See `examples/basic`, `examples/stream`, and `examples/mtr`.
 
 ## License
 

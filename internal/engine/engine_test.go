@@ -39,10 +39,10 @@ func testOptions() Options {
 	return Options{
 		IPVersion:     IPAny,
 		FirstHop:      1,
-		MaxHops:       30,
+		MaxHops:       64,
 		QueriesPerHop: 1,
 		Timeout:       time.Second,
-		PacketSize:    60,
+		PacketSize:    48,
 	}
 }
 

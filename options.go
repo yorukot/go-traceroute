@@ -36,10 +36,10 @@ func DefaultOptions() Options {
 	return Options{
 		IPVersion:     IPAny,
 		FirstHop:      1,
-		MaxHops:       30,
+		MaxHops:       64,
 		QueriesPerHop: 3,
 		Timeout:       3 * time.Second,
-		PacketSize:    60,
+		PacketSize:    48,
 		ResolveNames:  false,
 	}
 }
