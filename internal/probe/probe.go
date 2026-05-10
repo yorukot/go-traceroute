@@ -17,20 +17,12 @@ type Options struct {
 	PacketSize int
 }
 
-// ID correlates a sent probe with a reply.
-type ID struct {
-	Token       uint64
+// Sent describes a probe after it has been sent.
+type Sent struct {
 	HeaderToken uint32
 	TTL         int
 	Attempt     int
-}
-
-// Sent describes a probe after it has been sent.
-type Sent struct {
-	ID      ID
-	TTL     int
-	Attempt int
-	SentAt  time.Time
+	SentAt      time.Time
 }
 
 // ReplyKind classifies an internal backend reply.
@@ -46,7 +38,6 @@ const (
 
 // Reply describes a response matched to a sent probe.
 type Reply struct {
-	ID         ID
 	From       netip.Addr
 	ReceivedAt time.Time
 	RTT        time.Duration
@@ -55,7 +46,6 @@ type Reply struct {
 	ICMPType   int
 	ICMPCode   int
 	Annotation string
-	MTU        int
 }
 
 // Prober sends ICMP probes and waits for matching replies.

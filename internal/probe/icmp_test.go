@@ -11,11 +11,10 @@ import (
 
 func TestClassifyIPv4EchoReply(t *testing.T) {
 	token := makeICMPHeaderToken(1234, 7)
-	payloadToken := uint64(0x0102030405060708)
 	msg := &icmp.Message{
 		Type: ipv4.ICMPTypeEchoReply,
 		Code: 0,
-		Body: &icmp.Echo{ID: 1234, Seq: 7, Data: echoData(payloadToken, icmpTokenLen)},
+		Body: &icmp.Echo{ID: 1234, Seq: 7, Data: echoData(8)},
 	}
 
 	reply, ok := classifyICMPMessage(false, msg)
@@ -24,12 +23,6 @@ func TestClassifyIPv4EchoReply(t *testing.T) {
 	}
 	if reply.headerToken != token {
 		t.Fatalf("headerToken = %d, want %d", reply.headerToken, token)
-	}
-	if !reply.hasPayloadToken {
-		t.Fatal("missing payload token")
-	}
-	if reply.payloadToken != payloadToken {
-		t.Fatalf("payloadToken = %d, want %d", reply.payloadToken, payloadToken)
 	}
 	if reply.kind != ReplyDestination {
 		t.Fatalf("kind = %q, want %q", reply.kind, ReplyDestination)
@@ -56,58 +49,36 @@ func TestClassifyIPv4TimeExceeded(t *testing.T) {
 	}
 }
 
-func TestICMPReplyPrefersPayloadTokenForMatching(t *testing.T) {
-	reply := icmpReply{
-		payloadToken:    100,
-		hasPayloadToken: true,
-		headerToken:     200,
-	}
-
-	if !reply.matches(ID{Token: 100, HeaderToken: 999}) {
-		t.Fatal("payload token should match even when header token differs")
-	}
-	if reply.matches(ID{Token: 999, HeaderToken: 200}) {
-		t.Fatal("payload token should reject even when header token matches")
-	}
-}
-
-func TestICMPReplyFallsBackToHeaderTokenForMatching(t *testing.T) {
+func TestICMPReplyMatchesHeaderToken(t *testing.T) {
 	reply := icmpReply{
 		headerToken: 200,
 	}
 
-	if !reply.matches(ID{Token: 999, HeaderToken: 200}) {
-		t.Fatal("header token should match when payload token is unavailable")
+	if !reply.matches(200) {
+		t.Fatal("header token should match")
 	}
-	if reply.matches(ID{Token: 999, HeaderToken: 201}) {
+	if reply.matches(201) {
 		t.Fatal("header token should reject a different probe")
 	}
 }
 
-func TestTokenFromEchoUsesPayloadWhenAvailable(t *testing.T) {
-	payloadToken := uint64(0x1122334455667788)
+func TestTokenFromEchoUsesHeader(t *testing.T) {
 	msg := &icmp.Message{
 		Type: ipv4.ICMPTypeEchoReply,
 		Code: 0,
-		Body: &icmp.Echo{ID: 1234, Seq: 7, Data: echoData(payloadToken, icmpTokenLen)},
+		Body: &icmp.Echo{ID: 1234, Seq: 7, Data: echoData(8)},
 	}
 
 	token, ok := tokenFromEcho(msg)
 	if !ok {
 		t.Fatal("tokenFromEcho returned false")
 	}
-	if token.header != makeICMPHeaderToken(1234, 7) {
-		t.Fatalf("header = %d, want %d", token.header, makeICMPHeaderToken(1234, 7))
-	}
-	if !token.hasPayload {
-		t.Fatal("missing payload token")
-	}
-	if token.payload != payloadToken {
-		t.Fatalf("payload = %d, want %d", token.payload, payloadToken)
+	if token != makeICMPHeaderToken(1234, 7) {
+		t.Fatalf("token = %d, want %d", token, makeICMPHeaderToken(1234, 7))
 	}
 }
 
-func TestTokenFromEchoFallsBackToHeaderWithoutPayload(t *testing.T) {
+func TestTokenFromEchoUsesHeaderWithoutPayload(t *testing.T) {
 	msg := &icmp.Message{
 		Type: ipv4.ICMPTypeEchoReply,
 		Code: 0,
@@ -118,20 +89,17 @@ func TestTokenFromEchoFallsBackToHeaderWithoutPayload(t *testing.T) {
 	if !ok {
 		t.Fatal("tokenFromEcho returned false")
 	}
-	if token.header != makeICMPHeaderToken(1234, 7) {
-		t.Fatalf("header = %d, want %d", token.header, makeICMPHeaderToken(1234, 7))
-	}
-	if token.hasPayload {
-		t.Fatal("unexpected payload token")
+	if token != makeICMPHeaderToken(1234, 7) {
+		t.Fatalf("token = %d, want %d", token, makeICMPHeaderToken(1234, 7))
 	}
 }
 
-func TestNextICMPIDDerivesPayloadFromHeader(t *testing.T) {
+func TestNextICMPIDDerivesIdentifierAndSequenceFromHeader(t *testing.T) {
 	original := icmpHeaderCounter.Load()
 	icmpHeaderCounter.Store(0x12345677)
 	defer icmpHeaderCounter.Store(original)
 
-	identifier, sequence, headerToken, payloadToken := nextICMPID()
+	identifier, sequence, headerToken := nextICMPID()
 
 	if identifier != 0x1234 {
 		t.Fatalf("identifier = %#x, want 0x1234", identifier)
@@ -141,9 +109,6 @@ func TestNextICMPIDDerivesPayloadFromHeader(t *testing.T) {
 	}
 	if headerToken != 0x12345678 {
 		t.Fatalf("headerToken = %#x, want 0x12345678", headerToken)
-	}
-	if payloadToken != makeICMPToken(identifier, sequence) {
-		t.Fatalf("payloadToken = %#x, want %#x", payloadToken, makeICMPToken(identifier, sequence))
 	}
 }
 
@@ -169,7 +134,7 @@ func TestClassifyIPv6PacketTooBig(t *testing.T) {
 	msg := &icmp.Message{
 		Type: ipv6.ICMPTypePacketTooBig,
 		Code: 0,
-		Body: &icmp.PacketTooBig{MTU: 1280, Data: embedded},
+		Body: &icmp.PacketTooBig{Data: embedded},
 	}
 
 	reply, ok := classifyICMPMessage(true, msg)
@@ -178,9 +143,6 @@ func TestClassifyIPv6PacketTooBig(t *testing.T) {
 	}
 	if reply.kind != ReplyPacketTooBig {
 		t.Fatalf("kind = %q, want %q", reply.kind, ReplyPacketTooBig)
-	}
-	if reply.mtu != 1280 {
-		t.Fatalf("mtu = %d, want 1280", reply.mtu)
 	}
 }
 

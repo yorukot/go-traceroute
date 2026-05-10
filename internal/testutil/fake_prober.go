@@ -64,14 +64,10 @@ func (p *FakeProber) Send(ctx context.Context, ttl int, attempt int) (probe.Sent
 
 	p.counter++
 	sent := probe.Sent{
-		ID: probe.ID{
-			Token:   uint64(p.counter),
-			TTL:     ttl,
-			Attempt: attempt,
-		},
-		TTL:     ttl,
-		Attempt: attempt,
-		SentAt:  p.base.Add(time.Duration(p.counter) * time.Millisecond),
+		HeaderToken: uint32(p.counter),
+		TTL:         ttl,
+		Attempt:     attempt,
+		SentAt:      p.base.Add(time.Duration(p.counter) * time.Millisecond),
 	}
 	p.sent = append(p.sent, sent)
 	return sent, nil
@@ -100,7 +96,6 @@ func (p *FakeProber) Receive(ctx context.Context, sent probe.Sent, timeout time.
 	}
 
 	reply := hop.Replies[index]
-	reply.ID = sent.ID
 	if reply.ReceivedAt.IsZero() {
 		reply.ReceivedAt = sent.SentAt.Add(10 * time.Millisecond)
 	}
