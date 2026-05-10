@@ -25,7 +25,7 @@ type Hop struct {
 type Probe struct {
 	Attempt int `json:"attempt"`
 
-	Addr     netip.Addr `json:"addr,omitempty"`
+	Addr     netip.Addr `json:"addr"`
 	Hostname string     `json:"hostname,omitempty"`
 
 	SentAt     time.Time     `json:"sent_at"`

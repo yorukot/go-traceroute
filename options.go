@@ -14,8 +14,19 @@ const (
 	IPv6  IPVersion = 6
 )
 
-// Options controls ICMP trace behavior.
+// Protocol selects which probe packets are sent during a trace.
+type Protocol int
+
+const (
+	ProtocolICMP Protocol = iota
+	ProtocolUDP
+)
+
+const defaultUDPBasePort = 33434
+
+// Options controls trace behavior.
 type Options struct {
+	Protocol  Protocol
 	IPVersion IPVersion
 
 	FirstHop      int
@@ -24,7 +35,8 @@ type Options struct {
 
 	Timeout time.Duration
 
-	PacketSize int
+	PacketSize  int
+	UDPBasePort int
 
 	ResolveNames bool
 }
@@ -32,12 +44,14 @@ type Options struct {
 // DefaultOptions returns the package defaults.
 func DefaultOptions() Options {
 	return Options{
+		Protocol:      ProtocolICMP,
 		IPVersion:     IPAny,
 		FirstHop:      1,
 		MaxHops:       64,
 		QueriesPerHop: 3,
 		Timeout:       3 * time.Second,
 		PacketSize:    48,
+		UDPBasePort:   defaultUDPBasePort,
 		ResolveNames:  false,
 	}
 }
@@ -61,6 +75,9 @@ func (o Options) Normalize() Options {
 	if o.PacketSize == 0 {
 		o.PacketSize = d.PacketSize
 	}
+	if o.UDPBasePort == 0 {
+		o.UDPBasePort = d.UDPBasePort
+	}
 
 	return o
 }
@@ -82,11 +99,33 @@ func (o Options) Validate() error {
 	if o.PacketSize < 1 {
 		return fmt.Errorf("traceroute: PacketSize must be >= 1")
 	}
+	if o.UDPBasePort < 1 || o.UDPBasePort > 65535 {
+		return fmt.Errorf("traceroute: UDPBasePort must be between 1 and 65535")
+	}
 
 	switch o.IPVersion {
 	case IPAny, IPv4, IPv6:
-		return nil
 	default:
 		return fmt.Errorf("traceroute: unsupported IPVersion %d", o.IPVersion)
 	}
+
+	switch o.Protocol {
+	case ProtocolICMP:
+		return nil
+	case ProtocolUDP:
+		if o.udpPortRangeOverflows() {
+			return fmt.Errorf("traceroute: UDPBasePort range exceeds 65535")
+		}
+		return nil
+	default:
+		return fmt.Errorf("traceroute: unsupported Protocol %d", o.Protocol)
+	}
+}
+
+func (o Options) udpPortRangeOverflows() bool {
+	ttlCount := int64(o.MaxHops - o.FirstHop + 1)
+	queryCount := int64(o.QueriesPerHop)
+	available := int64(65535 - o.UDPBasePort + 1)
+
+	return ttlCount > available/queryCount
 }

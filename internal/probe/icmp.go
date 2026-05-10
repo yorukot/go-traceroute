@@ -21,6 +21,7 @@ import (
 const (
 	protocolICMPv4 = 1
 	protocolICMPv6 = 58
+	protocolUDP    = 17
 	icmpHeaderLen  = 8
 
 	readPollInterval = 100 * time.Millisecond
@@ -59,7 +60,9 @@ func init() {
 	icmpHeaderCounter.Store(uint32(value))
 }
 
-func newICMPProber(ctx context.Context, dst netip.Addr, opts Options) (Prober, error) {
+var newICMPProber = openICMPProber
+
+func openICMPProber(ctx context.Context, dst netip.Addr, opts Options) (Prober, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -335,22 +338,30 @@ func headerTokenFromEmbeddedPacket(ipv6Trace bool, packet []byte) (uint32, bool)
 }
 
 func stripIPv4Packet(packet []byte) []byte {
+	return stripIPv4Payload(packet, protocolICMPv4)
+}
+
+func stripIPv4Payload(packet []byte, protocol int) []byte {
 	if len(packet) == 0 || packet[0]>>4 != 4 {
 		return packet
 	}
 	header, err := ipv4.ParseHeader(packet)
-	if err != nil || header.Protocol != protocolICMPv4 || len(packet) < header.Len {
+	if err != nil || header.Protocol != protocol || len(packet) < header.Len {
 		return packet
 	}
 	return packet[header.Len:]
 }
 
 func stripIPv6Packet(packet []byte) []byte {
+	return stripIPv6Payload(packet, protocolICMPv6)
+}
+
+func stripIPv6Payload(packet []byte, nextHeader int) []byte {
 	if len(packet) == 0 || packet[0]>>4 != 6 {
 		return packet
 	}
 	header, err := ipv6.ParseHeader(packet)
-	if err != nil || header.NextHeader != protocolICMPv6 || len(packet) < ipv6.HeaderLen {
+	if err != nil || header.NextHeader != nextHeader || len(packet) < ipv6.HeaderLen {
 		return packet
 	}
 	return packet[ipv6.HeaderLen:]

@@ -2,6 +2,7 @@ package probe
 
 import (
 	"context"
+	"fmt"
 	"net/netip"
 )
 
@@ -13,5 +14,12 @@ func NewFactory() Factory {
 }
 
 func (defaultFactory) New(ctx context.Context, dst netip.Addr, opts Options) (Prober, error) {
-	return newICMPProber(ctx, dst, opts)
+	switch opts.Protocol {
+	case ProtocolICMP:
+		return newICMPProber(ctx, dst, opts)
+	case ProtocolUDP:
+		return newUDPProber(ctx, dst, opts)
+	default:
+		return nil, fmt.Errorf("traceroute: unsupported probe protocol %d", opts.Protocol)
+	}
 }

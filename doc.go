@@ -1,4 +1,4 @@
-// Package traceroute provides a small ICMP traceroute library.
+// Package traceroute provides a small ICMP and UDP traceroute library.
 //
 // Most full traceroute modes require permission to create raw sockets. Callers
 // should expect ErrPermission on systems where the current process cannot open

@@ -12,9 +12,21 @@ var (
 	ErrTimeout    = errors.New("traceroute: timeout")
 )
 
+// Protocol selects which probe packets are sent during a trace.
+type Protocol int
+
+const (
+	ProtocolICMP Protocol = iota
+	ProtocolUDP
+)
+
 // Options is the internal prober configuration copied from the public API.
 type Options struct {
-	PacketSize int
+	Protocol      Protocol
+	FirstHop      int
+	QueriesPerHop int
+	PacketSize    int
+	UDPBasePort   int
 }
 
 // Sent describes a probe after it has been sent.
@@ -48,7 +60,7 @@ type Reply struct {
 	Annotation string
 }
 
-// Prober sends ICMP probes and waits for matching replies.
+// Prober sends probes and waits for matching replies.
 type Prober interface {
 	Send(ctx context.Context, ttl int, attempt int) (Sent, error)
 	Receive(ctx context.Context, sent Sent, timeout time.Duration) (Reply, error)

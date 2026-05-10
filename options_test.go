@@ -14,6 +14,12 @@ func TestOptionsNormalize(t *testing.T) {
 	if opts.PacketSize != 48 {
 		t.Fatalf("PacketSize = %d, want 48", opts.PacketSize)
 	}
+	if opts.Protocol != ProtocolICMP {
+		t.Fatalf("Protocol = %d, want %d", opts.Protocol, ProtocolICMP)
+	}
+	if opts.UDPBasePort != defaultUDPBasePort {
+		t.Fatalf("UDPBasePort = %d, want %d", opts.UDPBasePort, defaultUDPBasePort)
+	}
 }
 
 func TestOptionsValidate(t *testing.T) {
@@ -55,6 +61,42 @@ func TestOptionsValidate(t *testing.T) {
 				o.IPVersion = 99
 			},
 			wantErr: true,
+		},
+		{
+			name: "bad protocol",
+			mutate: func(o *Options) {
+				o.Protocol = 99
+			},
+			wantErr: true,
+		},
+		{
+			name: "bad udp base port",
+			mutate: func(o *Options) {
+				o.UDPBasePort = 65536
+			},
+			wantErr: true,
+		},
+		{
+			name: "udp port range overflow",
+			mutate: func(o *Options) {
+				o.Protocol = ProtocolUDP
+				o.UDPBasePort = 65534
+				o.FirstHop = 1
+				o.MaxHops = 1
+				o.QueriesPerHop = 3
+			},
+			wantErr: true,
+		},
+		{
+			name: "udp port range fits",
+			mutate: func(o *Options) {
+				o.Protocol = ProtocolUDP
+				o.UDPBasePort = 65533
+				o.FirstHop = 1
+				o.MaxHops = 1
+				o.QueriesPerHop = 3
+			},
+			wantErr: false,
 		},
 	}
 

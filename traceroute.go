@@ -94,12 +94,14 @@ func (t *Tracer) translateError(err error) error {
 
 func toEngineOptions(opts Options) engine.Options {
 	return engine.Options{
+		Protocol:      engine.Protocol(opts.Protocol),
 		IPVersion:     engine.IPVersion(opts.IPVersion),
 		FirstHop:      opts.FirstHop,
 		MaxHops:       opts.MaxHops,
 		QueriesPerHop: opts.QueriesPerHop,
 		Timeout:       opts.Timeout,
 		PacketSize:    opts.PacketSize,
+		UDPBasePort:   opts.UDPBasePort,
 		ResolveNames:  opts.ResolveNames,
 	}
 }

@@ -19,7 +19,15 @@ const (
 	IPv6  IPVersion = 6
 )
 
+type Protocol int
+
+const (
+	ProtocolICMP Protocol = iota
+	ProtocolUDP
+)
+
 type Options struct {
+	Protocol  Protocol
 	IPVersion IPVersion
 
 	FirstHop      int
@@ -28,7 +36,8 @@ type Options struct {
 
 	Timeout time.Duration
 
-	PacketSize int
+	PacketSize  int
+	UDPBasePort int
 
 	ResolveNames bool
 }

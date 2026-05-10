@@ -22,6 +22,21 @@ func ExampleNew() {
 	_ = tr
 }
 
+func ExampleNew_udp() {
+	tr, err := traceroute.New(traceroute.Options{
+		Protocol:      traceroute.ProtocolUDP,
+		UDPBasePort:   33434,
+		MaxHops:       64,
+		QueriesPerHop: 3,
+		Timeout:       2 * time.Second,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	_ = tr
+}
+
 func ExampleTraceRoute_permissionHandling() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

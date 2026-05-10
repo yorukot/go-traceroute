@@ -111,7 +111,11 @@ func (e *Engine) resolve(ctx context.Context, target string) (netip.Addr, error)
 
 func (e *Engine) probeOptions() probe.Options {
 	return probe.Options{
-		PacketSize: e.opts.PacketSize,
+		Protocol:      probe.Protocol(e.opts.Protocol),
+		FirstHop:      e.opts.FirstHop,
+		QueriesPerHop: e.opts.QueriesPerHop,
+		PacketSize:    e.opts.PacketSize,
+		UDPBasePort:   e.opts.UDPBasePort,
 	}
 }
 
