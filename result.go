@@ -29,7 +29,7 @@ type Probe struct {
 	Hostname string     `json:"hostname,omitempty"`
 
 	SentAt     time.Time     `json:"sent_at"`
-	ReceivedAt time.Time     `json:"received_at,omitempty"`
+	ReceivedAt time.Time     `json:"received_at,omitzero"`
 	RTT        time.Duration `json:"rtt,omitempty"`
 
 	Status     Status `json:"status"`
