@@ -11,7 +11,6 @@ import (
 
 func ExampleNew() {
 	tr, err := traceroute.New(traceroute.Options{
-		Method:        traceroute.MethodICMP,
 		MaxHops:       30,
 		QueriesPerHop: 3,
 		Timeout:       2 * time.Second,
@@ -28,13 +27,10 @@ func ExampleTraceRoute_permissionHandling() {
 	defer cancel()
 
 	result, err := traceroute.TraceRoute(ctx, "127.0.0.1", traceroute.Options{
-		Method: traceroute.MethodICMP,
+		MaxHops: 1,
 	})
 	if err != nil {
 		if errors.Is(err, traceroute.ErrPermission) {
-			return
-		}
-		if errors.Is(err, traceroute.ErrUnsupported) {
 			return
 		}
 		panic(err)

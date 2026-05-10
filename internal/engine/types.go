@@ -20,7 +20,6 @@ const (
 )
 
 type Options struct {
-	Method    string
 	IPVersion IPVersion
 
 	FirstHop      int
@@ -28,23 +27,10 @@ type Options struct {
 	QueriesPerHop int
 
 	Timeout time.Duration
-	Wait    time.Duration
 
 	PacketSize int
 
-	SourceAddress netip.Addr
-	Interface     string
-
-	BasePort        uint16
-	DestinationPort uint16
-	SourcePort      uint16
-
-	TOS          int
-	TrafficClass int
-	DontFragment bool
-
 	ResolveNames bool
-	Parallelism  int
 }
 
 type Resolver interface {
@@ -55,7 +41,6 @@ type Resolver interface {
 type Trace struct {
 	Target      string
 	Destination netip.Addr
-	Method      string
 	IPVersion   IPVersion
 	StartedAt   time.Time
 	FinishedAt  time.Time
@@ -118,7 +103,6 @@ type Event struct {
 type HopProbe struct {
 	TTL     int
 	Attempt int
-	Method  string
 }
 
 type Sink interface {

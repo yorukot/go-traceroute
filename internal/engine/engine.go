@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
+	"time"
 
-	"github.com/yorukot/go-traceroute/internal/clock"
 	"github.com/yorukot/go-traceroute/internal/probe"
 )
 
@@ -15,19 +15,14 @@ type Engine struct {
 	opts    Options
 	res     Resolver
 	factory probe.Factory
-	clock   clock.Clock
 	sink    Sink
 }
 
-func New(opts Options, res Resolver, factory probe.Factory, clk clock.Clock, sink Sink) *Engine {
-	if clk == nil {
-		clk = clock.RealClock{}
-	}
+func New(opts Options, res Resolver, factory probe.Factory, sink Sink) *Engine {
 	return &Engine{
 		opts:    opts,
 		res:     res,
 		factory: factory,
-		clock:   clk,
 		sink:    sink,
 	}
 }
@@ -62,9 +57,8 @@ func (e *Engine) Trace(ctx context.Context, target string) (*Trace, error) {
 	trace := &Trace{
 		Target:      target,
 		Destination: dest,
-		Method:      e.opts.Method,
 		IPVersion:   versionOf(dest),
-		StartedAt:   e.clock.Now(),
+		StartedAt:   time.Now(),
 	}
 
 	for ttl := e.opts.FirstHop; ttl <= e.opts.MaxHops; ttl++ {
@@ -83,15 +77,9 @@ func (e *Engine) Trace(ctx context.Context, target string) (*Trace, error) {
 		if reachedDestination(hop) {
 			break
 		}
-
-		if e.opts.Wait > 0 {
-			if err := e.clock.Sleep(ctx, e.opts.Wait); err != nil {
-				return trace, err
-			}
-		}
 	}
 
-	trace.FinishedAt = e.clock.Now()
+	trace.FinishedAt = time.Now()
 	e.emit(Event{Kind: EventDone, Trace: trace})
 	return trace, nil
 }
@@ -123,18 +111,7 @@ func (e *Engine) resolve(ctx context.Context, target string) (netip.Addr, error)
 
 func (e *Engine) probeOptions() probe.Options {
 	return probe.Options{
-		Method:          e.opts.Method,
-		IPVersion:       int(e.opts.IPVersion),
-		Timeout:         e.opts.Timeout,
-		PacketSize:      e.opts.PacketSize,
-		SourceAddress:   e.opts.SourceAddress,
-		Interface:       e.opts.Interface,
-		BasePort:        e.opts.BasePort,
-		DestinationPort: e.opts.DestinationPort,
-		SourcePort:      e.opts.SourcePort,
-		TOS:             e.opts.TOS,
-		TrafficClass:    e.opts.TrafficClass,
-		DontFragment:    e.opts.DontFragment,
+		PacketSize: e.opts.PacketSize,
 	}
 }
 

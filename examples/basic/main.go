@@ -14,23 +14,19 @@ func main() {
 	defer cancel()
 
 	tr, err := traceroute.New(traceroute.Options{
-		Method:        traceroute.MethodICMP,
 		MaxHops:       30,
 		QueriesPerHop: 3,
 		Timeout:       2 * time.Second,
+		ResolveNames:  true,
 	})
 	if err != nil {
 		panic(err)
 	}
 
-	result, err := tr.Trace(ctx, "example.com")
+	result, err := tr.Trace(ctx, "1.1.1.1")
 	if err != nil {
 		if errors.Is(err, traceroute.ErrPermission) {
 			fmt.Println("raw socket permission required")
-			return
-		}
-		if errors.Is(err, traceroute.ErrUnsupported) {
-			fmt.Println("trace backend is not supported yet")
 			return
 		}
 		panic(err)
@@ -43,7 +39,11 @@ func main() {
 				fmt.Print(" *")
 				continue
 			}
-			fmt.Printf(" %s %.3fms", probe.Addr, float64(probe.RTT.Microseconds())/1000)
+			host := probe.Addr.String()
+			if probe.Hostname != "" {
+				host = probe.Hostname
+			}
+			fmt.Printf(" %s %.3fms", host, float64(probe.RTT.Microseconds())/1000)
 		}
 		fmt.Println()
 	}

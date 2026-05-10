@@ -2,17 +2,9 @@ package traceroute
 
 import (
 	"context"
-	"errors"
 	"net"
 	"net/netip"
-	"strings"
 )
-
-// Resolver allows callers to provide deterministic or custom DNS behavior.
-type Resolver interface {
-	LookupIP(ctx context.Context, host string, version IPVersion) ([]netip.Addr, error)
-	LookupAddr(ctx context.Context, addr netip.Addr) ([]string, error)
-}
 
 type defaultResolver struct {
 	resolver *net.Resolver
@@ -67,9 +59,6 @@ func (r defaultResolver) LookupAddr(ctx context.Context, addr netip.Addr) ([]str
 	if err != nil {
 		return nil, err
 	}
-	for i := range names {
-		names[i] = strings.TrimSuffix(names[i], ".")
-	}
 	return names, nil
 }
 
@@ -84,14 +73,4 @@ func addressMatchesVersion(addr netip.Addr, version IPVersion) bool {
 	default:
 		return false
 	}
-}
-
-func normalizeResolverError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if errors.Is(err, ErrNoAddress) {
-		return ErrNoAddress
-	}
-	return err
 }

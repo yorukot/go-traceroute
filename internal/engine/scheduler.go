@@ -32,7 +32,6 @@ func (e *Engine) traceHop(ctx context.Context, prober probe.Prober, ttl int) (Ho
 			HopProbe: &HopProbe{
 				TTL:     ttl,
 				Attempt: attempt,
-				Method:  e.opts.Method,
 			},
 		})
 

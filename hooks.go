@@ -12,5 +12,4 @@ type Hooks struct {
 type HopProbe struct {
 	TTL     int
 	Attempt int
-	Method  Method
 }

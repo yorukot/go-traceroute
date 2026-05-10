@@ -5,9 +5,6 @@ import "testing"
 func TestOptionsNormalize(t *testing.T) {
 	opts := Options{}.Normalize()
 
-	if opts.Method != MethodUDP {
-		t.Fatalf("Method = %q, want %q", opts.Method, MethodUDP)
-	}
 	if opts.MaxHops != 30 {
 		t.Fatalf("MaxHops = %d, want 30", opts.MaxHops)
 	}
@@ -43,16 +40,16 @@ func TestOptionsValidate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "bad tos",
+			name: "bad packet size",
 			mutate: func(o *Options) {
-				o.TOS = 999
+				o.PacketSize = -1
 			},
 			wantErr: true,
 		},
 		{
-			name: "bad method",
+			name: "bad ip version",
 			mutate: func(o *Options) {
-				o.Method = "bogus"
+				o.IPVersion = 99
 			},
 			wantErr: true,
 		},

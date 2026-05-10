@@ -11,7 +11,6 @@ func TestTraceJSON(t *testing.T) {
 	trace := Trace{
 		Target:      "example.com",
 		Destination: netip.MustParseAddr("93.184.216.34"),
-		Method:      MethodICMP,
 		IPVersion:   IPv4,
 		Hops: []Hop{
 			{

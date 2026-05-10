@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yorukot/go-traceroute/internal/clock"
 	"github.com/yorukot/go-traceroute/internal/probe"
 	"github.com/yorukot/go-traceroute/internal/testutil"
 )
@@ -38,15 +37,12 @@ func (r fakeResolver) LookupAddr(ctx context.Context, addr netip.Addr) ([]string
 
 func testOptions() Options {
 	return Options{
-		Method:        "icmp",
 		IPVersion:     IPAny,
 		FirstHop:      1,
 		MaxHops:       30,
 		QueriesPerHop: 1,
 		Timeout:       time.Second,
 		PacketSize:    60,
-		BasePort:      33434,
-		Parallelism:   1,
 	}
 }
 
@@ -77,7 +73,6 @@ func TestEngineStopsWhenDestinationReached(t *testing.T) {
 		testOptions(),
 		fakeResolver{addrs: []netip.Addr{dst}},
 		testutil.FakeFactory{Prober: prober},
-		clock.NewFake(time.Date(2026, 5, 10, 8, 0, 0, 0, time.UTC)),
 		nil,
 	)
 
@@ -115,7 +110,6 @@ func TestEngineContinuesAfterTimeout(t *testing.T) {
 		testOptions(),
 		fakeResolver{addrs: []netip.Addr{dst}},
 		testutil.FakeFactory{Prober: prober},
-		clock.NewFake(time.Date(2026, 5, 10, 8, 0, 0, 0, time.UTC)),
 		nil,
 	)
 
@@ -162,7 +156,6 @@ func TestEngineMaxHopsIsPartialTraceNotFatal(t *testing.T) {
 		opts,
 		fakeResolver{addrs: []netip.Addr{dst}},
 		testutil.FakeFactory{Prober: prober},
-		clock.NewFake(time.Date(2026, 5, 10, 8, 0, 0, 0, time.UTC)),
 		nil,
 	)
 
@@ -200,7 +193,6 @@ func TestEngineResolveNamesDoesNotFailTrace(t *testing.T) {
 			names: map[netip.Addr][]string{hopAddr: []string{"router.local"}},
 		},
 		testutil.FakeFactory{Prober: prober},
-		clock.NewFake(time.Date(2026, 5, 10, 8, 0, 0, 0, time.UTC)),
 		nil,
 	)
 
@@ -223,7 +215,6 @@ func TestEngineContextCancellation(t *testing.T) {
 		testOptions(),
 		fakeResolver{addrs: []netip.Addr{dst}},
 		testutil.FakeFactory{Prober: prober},
-		clock.NewFake(time.Date(2026, 5, 10, 8, 0, 0, 0, time.UTC)),
 		nil,
 	)
 
@@ -252,7 +243,6 @@ func TestEngineEmitsStreamEventsInOrder(t *testing.T) {
 		testOptions(),
 		fakeResolver{addrs: []netip.Addr{dst}},
 		testutil.FakeFactory{Prober: prober},
-		clock.NewFake(time.Date(2026, 5, 10, 8, 0, 0, 0, time.UTC)),
 		&sink,
 	)
 

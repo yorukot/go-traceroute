@@ -9,7 +9,6 @@ import (
 type Trace struct {
 	Target      string     `json:"target"`
 	Destination netip.Addr `json:"destination"`
-	Method      Method     `json:"method"`
 	IPVersion   IPVersion  `json:"ip_version"`
 	StartedAt   time.Time  `json:"started_at"`
 	FinishedAt  time.Time  `json:"finished_at"`
@@ -39,9 +38,6 @@ type Probe struct {
 	ICMPType int `json:"icmp_type,omitempty"`
 	ICMPCode int `json:"icmp_code,omitempty"`
 
-	ASN  *ASN        `json:"asn,omitempty"`
-	MPLS []MPLSLabel `json:"mpls,omitempty"`
-
 	Error string `json:"error,omitempty"`
 }
 
@@ -57,17 +53,3 @@ const (
 	StatusPacketTooBig Status = "packet-too-big"
 	StatusError        Status = "error"
 )
-
-// ASN contains optional autonomous system metadata for a responding hop.
-type ASN struct {
-	Number int    `json:"number"`
-	Name   string `json:"name,omitempty"`
-}
-
-// MPLSLabel contains optional MPLS label metadata reported by a hop.
-type MPLSLabel struct {
-	Label int  `json:"label"`
-	Exp   int  `json:"exp"`
-	S     bool `json:"s"`
-	TTL   int  `json:"ttl"`
-}

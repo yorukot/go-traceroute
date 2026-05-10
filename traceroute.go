@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/netip"
 
-	"github.com/yorukot/go-traceroute/internal/clock"
 	"github.com/yorukot/go-traceroute/internal/engine"
 	"github.com/yorukot/go-traceroute/internal/probe"
 )
@@ -66,9 +65,8 @@ func (t *Tracer) TraceStream(ctx context.Context, target string) (<-chan Event, 
 func (t *Tracer) newEngine(events chan<- Event) *engine.Engine {
 	return engine.New(
 		toEngineOptions(t.opts),
-		resolverAdapter{resolver: t.opts.Resolver},
+		resolverAdapter{},
 		probe.NewFactory(),
-		clock.RealClock{},
 		traceSink{
 			events: events,
 			hooks:  t.opts.Hooks,
@@ -83,12 +81,8 @@ func (t *Tracer) translateError(err error) error {
 	if errors.Is(err, probe.ErrPermission) {
 		return &PermissionError{
 			Operation: "socket",
-			Method:    t.opts.Method,
 			Cause:     err,
 		}
-	}
-	if errors.Is(err, probe.ErrUnsupported) {
-		return fmt.Errorf("%w: %w", ErrUnsupported, err)
 	}
 	if errors.Is(err, probe.ErrTimeout) {
 		return fmt.Errorf("%w: %w", ErrTimeout, err)
@@ -101,38 +95,21 @@ func (t *Tracer) translateError(err error) error {
 
 func toEngineOptions(opts Options) engine.Options {
 	return engine.Options{
-		Method:          opts.Method.String(),
-		IPVersion:       engine.IPVersion(opts.IPVersion),
-		FirstHop:        opts.FirstHop,
-		MaxHops:         opts.MaxHops,
-		QueriesPerHop:   opts.QueriesPerHop,
-		Timeout:         opts.Timeout,
-		Wait:            opts.Wait,
-		PacketSize:      opts.PacketSize,
-		SourceAddress:   opts.SourceAddress,
-		Interface:       opts.Interface,
-		BasePort:        opts.BasePort,
-		DestinationPort: opts.DestinationPort,
-		SourcePort:      opts.SourcePort,
-		TOS:             opts.TOS,
-		TrafficClass:    opts.TrafficClass,
-		DontFragment:    opts.DontFragment,
-		ResolveNames:    opts.ResolveNames,
-		Parallelism:     opts.Parallelism,
+		IPVersion:     engine.IPVersion(opts.IPVersion),
+		FirstHop:      opts.FirstHop,
+		MaxHops:       opts.MaxHops,
+		QueriesPerHop: opts.QueriesPerHop,
+		Timeout:       opts.Timeout,
+		PacketSize:    opts.PacketSize,
+		ResolveNames:  opts.ResolveNames,
 	}
 }
 
 type resolverAdapter struct {
-	resolver Resolver
 }
 
 func (r resolverAdapter) LookupIP(ctx context.Context, host string, version engine.IPVersion) ([]netip.Addr, error) {
-	resolver := r.resolver
-	if resolver == nil {
-		resolver = defaultResolver{}
-	}
-
-	addrs, err := resolver.LookupIP(ctx, host, IPVersion(version))
+	addrs, err := (defaultResolver{}).LookupIP(ctx, host, IPVersion(version))
 	if errors.Is(err, ErrNoAddress) {
 		return nil, engine.ErrNoAddress
 	}
@@ -140,11 +117,7 @@ func (r resolverAdapter) LookupIP(ctx context.Context, host string, version engi
 }
 
 func (r resolverAdapter) LookupAddr(ctx context.Context, addr netip.Addr) ([]string, error) {
-	resolver := r.resolver
-	if resolver == nil {
-		resolver = defaultResolver{}
-	}
-	return resolver.LookupAddr(ctx, addr)
+	return (defaultResolver{}).LookupAddr(ctx, addr)
 }
 
 type traceSink struct {
@@ -159,7 +132,6 @@ func (s traceSink) Emit(event engine.Event) {
 			s.hooks.OnProbeSent(HopProbe{
 				TTL:     event.HopProbe.TTL,
 				Attempt: event.HopProbe.Attempt,
-				Method:  Method(event.HopProbe.Method),
 			})
 		}
 	case engine.EventProbe:
@@ -203,7 +175,6 @@ func convertTrace(trace *engine.Trace) *Trace {
 	converted := &Trace{
 		Target:      trace.Target,
 		Destination: trace.Destination,
-		Method:      Method(trace.Method),
 		IPVersion:   IPVersion(trace.IPVersion),
 		StartedAt:   trace.StartedAt,
 		FinishedAt:  trace.FinishedAt,

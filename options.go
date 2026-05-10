@@ -2,8 +2,6 @@ package traceroute
 
 import (
 	"fmt"
-	"log/slog"
-	"net/netip"
 	"time"
 )
 
@@ -16,9 +14,8 @@ const (
 	IPv6  IPVersion = 6
 )
 
-// Options controls trace behavior.
+// Options controls ICMP trace behavior.
 type Options struct {
-	Method    Method
 	IPVersion IPVersion
 
 	FirstHop      int
@@ -26,46 +23,24 @@ type Options struct {
 	QueriesPerHop int
 
 	Timeout time.Duration
-	Wait    time.Duration
 
 	PacketSize int
 
-	SourceAddress netip.Addr
-	Interface     string
-
-	BasePort        uint16
-	DestinationPort uint16
-	SourcePort      uint16
-
-	TOS          int
-	TrafficClass int
-	DontFragment bool
-
 	ResolveNames bool
-	LookupASN    bool
-	IncludeMPLS  bool
 
-	Parallelism int
-
-	Resolver Resolver
-	Hooks    Hooks
-	Logger   *slog.Logger
+	Hooks Hooks
 }
 
 // DefaultOptions returns the package defaults.
 func DefaultOptions() Options {
 	return Options{
-		Method:        MethodUDP,
 		IPVersion:     IPAny,
 		FirstHop:      1,
 		MaxHops:       30,
 		QueriesPerHop: 3,
 		Timeout:       3 * time.Second,
-		Wait:          0,
 		PacketSize:    60,
-		BasePort:      33434,
 		ResolveNames:  false,
-		Parallelism:   1,
 	}
 }
 
@@ -73,9 +48,6 @@ func DefaultOptions() Options {
 func (o Options) Normalize() Options {
 	d := DefaultOptions()
 
-	if o.Method == "" {
-		o.Method = d.Method
-	}
 	if o.FirstHop == 0 {
 		o.FirstHop = d.FirstHop
 	}
@@ -90,12 +62,6 @@ func (o Options) Normalize() Options {
 	}
 	if o.PacketSize == 0 {
 		o.PacketSize = d.PacketSize
-	}
-	if o.BasePort == 0 {
-		o.BasePort = d.BasePort
-	}
-	if o.Parallelism == 0 {
-		o.Parallelism = d.Parallelism
 	}
 
 	return o
@@ -115,32 +81,14 @@ func (o Options) Validate() error {
 	if o.Timeout <= 0 {
 		return fmt.Errorf("traceroute: Timeout must be positive")
 	}
-	if o.Wait < 0 {
-		return fmt.Errorf("traceroute: Wait must be >= 0")
-	}
 	if o.PacketSize < 1 {
 		return fmt.Errorf("traceroute: PacketSize must be >= 1")
-	}
-	if o.TOS < 0 || o.TOS > 255 {
-		return fmt.Errorf("traceroute: TOS must be between 0 and 255")
-	}
-	if o.TrafficClass < 0 || o.TrafficClass > 255 {
-		return fmt.Errorf("traceroute: TrafficClass must be between 0 and 255")
-	}
-	if o.Parallelism < 1 {
-		return fmt.Errorf("traceroute: Parallelism must be >= 1")
 	}
 
 	switch o.IPVersion {
 	case IPAny, IPv4, IPv6:
-	default:
-		return fmt.Errorf("traceroute: unsupported IPVersion %d", o.IPVersion)
-	}
-
-	switch o.Method {
-	case MethodICMP, MethodUDP, MethodTCP, MethodUDPParis, MethodICMPParis:
 		return nil
 	default:
-		return fmt.Errorf("traceroute: unsupported method %q", o.Method)
+		return fmt.Errorf("traceroute: unsupported IPVersion %d", o.IPVersion)
 	}
 }

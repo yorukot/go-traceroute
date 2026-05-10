@@ -1,7 +1,6 @@
 # go-traceroute
 
-`go-traceroute` is a Go library for tracing network paths and returning
-structured results.
+`go-traceroute` is a Go library for ICMP traceroute with structured results.
 
 The public API is intentionally small: callers configure a `Tracer`, run a
 blocking trace with `Trace`, or stream progress with `TraceStream`. Formatting
@@ -9,7 +8,6 @@ classic traceroute output is left to the caller.
 
 ```go
 tr, err := traceroute.New(traceroute.Options{
-    Method:        traceroute.MethodICMP,
     MaxHops:       30,
     QueriesPerHop: 3,
     Timeout:       2 * time.Second,
@@ -28,11 +26,10 @@ for _, hop := range result.Hops {
 }
 ```
 
-## Status
+## Permissions
 
-This repository currently contains the public API, internal engine, probe
-interfaces, fake test utilities, and examples. Real ICMP/UDP/TCP socket
-backends are still pending, so traces currently return `ErrUnsupported`.
+ICMP tracing uses raw sockets on most systems. Run with the required privileges
+or capabilities for your platform, otherwise traces return `ErrPermission`.
 
 ## Examples
 
