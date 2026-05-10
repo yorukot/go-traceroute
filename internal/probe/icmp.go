@@ -2,12 +2,14 @@ package probe
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/binary"
 	"errors"
 	"net"
 	"net/netip"
 	"os"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -20,11 +22,17 @@ const (
 	protocolICMPv4 = 1
 	protocolICMPv6 = 58
 	icmpHeaderLen  = 8
+	icmpTokenLen   = 8
 
 	readPollInterval = 100 * time.Millisecond
 )
 
 var listenICMPPacket = icmp.ListenPacket
+
+var (
+	icmpHeaderCounter  atomic.Uint32
+	icmpPayloadCounter atomic.Uint64
+)
 
 type icmpProber struct {
 	conn *icmp.PacketConn
@@ -33,20 +41,37 @@ type icmpProber struct {
 	ipv6       bool
 	protocol   int
 	echoType   icmp.Type
-	identifier int
 	packetSize int
 
-	mu       sync.Mutex
-	sequence uint16
+	mu sync.Mutex
 }
 
 type icmpReply struct {
-	token      uint64
-	kind       ReplyKind
-	icmpType   int
-	icmpCode   int
-	annotation string
-	mtu        int
+	payloadToken    uint64
+	hasPayloadToken bool
+	headerToken     uint32
+	kind            ReplyKind
+	icmpType        int
+	icmpCode        int
+	annotation      string
+	mtu             int
+}
+
+type icmpToken struct {
+	payload    uint64
+	hasPayload bool
+	header     uint32
+}
+
+func init() {
+	var seed [8]byte
+	if _, err := rand.Read(seed[:]); err != nil {
+		binary.BigEndian.PutUint64(seed[:], uint64(time.Now().UnixNano())^uint64(os.Getpid())<<32)
+	}
+
+	value := binary.BigEndian.Uint64(seed[:])
+	icmpHeaderCounter.Store(uint32(value))
+	icmpPayloadCounter.Store(value)
 }
 
 func newICMPProber(ctx context.Context, dst netip.Addr, opts Options) (Prober, error) {
@@ -82,7 +107,6 @@ func newICMPProber(ctx context.Context, dst netip.Addr, opts Options) (Prober, e
 		ipv6:       ipv6Trace,
 		protocol:   protocol,
 		echoType:   echoType,
-		identifier: os.Getpid() & 0xffff,
 		packetSize: packetSize,
 	}, nil
 }
@@ -95,12 +119,12 @@ func (p *icmpProber) Send(ctx context.Context, ttl int, attempt int) (Sent, erro
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	p.sequence++
-	seq := p.sequence
+	identifier, seq, headerToken, payloadToken := nextICMPID()
 	id := ID{
-		Token:   makeICMPToken(p.identifier, int(seq)),
-		TTL:     ttl,
-		Attempt: attempt,
+		Token:       payloadToken,
+		HeaderToken: headerToken,
+		TTL:         ttl,
+		Attempt:     attempt,
 	}
 
 	if err := p.setHopLimit(ttl); err != nil {
@@ -116,9 +140,9 @@ func (p *icmpProber) Send(ctx context.Context, ttl int, attempt int) (Sent, erro
 		Type: p.echoType,
 		Code: 0,
 		Body: &icmp.Echo{
-			ID:   p.identifier,
-			Seq:  int(seq),
-			Data: echoData(id.Token, p.packetSize-icmpHeaderLen),
+			ID:   identifier,
+			Seq:  seq,
+			Data: echoData(payloadToken, p.packetSize-icmpHeaderLen),
 		},
 	}
 	packet, err := msg.Marshal(nil)
@@ -174,7 +198,7 @@ func (p *icmpProber) Receive(ctx context.Context, sent Sent, timeout time.Durati
 		}
 
 		parsed, ok := parseICMPReply(p.ipv6, buf[:n])
-		if !ok || parsed.token != sent.ID.Token {
+		if !ok || !parsed.matches(sent.ID) {
 			continue
 		}
 
@@ -235,7 +259,7 @@ func classifyICMPv4Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool)
 	switch msg.Type {
 	case ipv4.ICMPTypeEchoReply:
 		token, ok := tokenFromEcho(msg)
-		reply.token = token
+		reply.setToken(token)
 		reply.kind = ReplyDestination
 		return reply, ok
 	case ipv4.ICMPTypeTimeExceeded:
@@ -244,7 +268,7 @@ func classifyICMPv4Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool)
 			return icmpReply{}, false
 		}
 		token, ok := tokenFromEmbeddedPacket(false, body.Data)
-		reply.token = token
+		reply.setToken(token)
 		reply.kind = ReplyTimeExceeded
 		reply.annotation = ipv4TimeExceededAnnotation(msg.Code)
 		return reply, ok
@@ -254,7 +278,7 @@ func classifyICMPv4Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool)
 			return icmpReply{}, false
 		}
 		token, ok := tokenFromEmbeddedPacket(false, body.Data)
-		reply.token = token
+		reply.setToken(token)
 		reply.kind = ipv4DestinationUnreachableKind(msg.Code)
 		reply.annotation = ipv4DestinationUnreachableAnnotation(msg.Code)
 		return reply, ok
@@ -267,7 +291,7 @@ func classifyICMPv6Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool)
 	switch msg.Type {
 	case ipv6.ICMPTypeEchoReply:
 		token, ok := tokenFromEcho(msg)
-		reply.token = token
+		reply.setToken(token)
 		reply.kind = ReplyDestination
 		return reply, ok
 	case ipv6.ICMPTypeTimeExceeded:
@@ -276,7 +300,7 @@ func classifyICMPv6Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool)
 			return icmpReply{}, false
 		}
 		token, ok := tokenFromEmbeddedPacket(true, body.Data)
-		reply.token = token
+		reply.setToken(token)
 		reply.kind = ReplyTimeExceeded
 		reply.annotation = ipv6TimeExceededAnnotation(msg.Code)
 		return reply, ok
@@ -286,7 +310,7 @@ func classifyICMPv6Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool)
 			return icmpReply{}, false
 		}
 		token, ok := tokenFromEmbeddedPacket(true, body.Data)
-		reply.token = token
+		reply.setToken(token)
 		reply.kind = ipv6DestinationUnreachableKind(msg.Code)
 		reply.annotation = ipv6DestinationUnreachableAnnotation(msg.Code)
 		return reply, ok
@@ -296,7 +320,7 @@ func classifyICMPv6Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool)
 			return icmpReply{}, false
 		}
 		token, ok := tokenFromEmbeddedPacket(true, body.Data)
-		reply.token = token
+		reply.setToken(token)
 		reply.kind = ReplyPacketTooBig
 		reply.annotation = "packet too big"
 		reply.mtu = body.MTU
@@ -306,15 +330,22 @@ func classifyICMPv6Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool)
 	}
 }
 
-func tokenFromEcho(msg *icmp.Message) (uint64, bool) {
+func tokenFromEcho(msg *icmp.Message) (icmpToken, bool) {
 	echo, ok := msg.Body.(*icmp.Echo)
 	if !ok {
-		return 0, false
+		return icmpToken{}, false
 	}
-	return makeICMPToken(echo.ID, echo.Seq), true
+	token := icmpToken{
+		header: makeICMPHeaderToken(echo.ID, echo.Seq),
+	}
+	if len(echo.Data) >= icmpTokenLen {
+		token.payload = binary.BigEndian.Uint64(echo.Data[:icmpTokenLen])
+		token.hasPayload = true
+	}
+	return token, true
 }
 
-func tokenFromEmbeddedPacket(ipv6Trace bool, packet []byte) (uint64, bool) {
+func tokenFromEmbeddedPacket(ipv6Trace bool, packet []byte) (icmpToken, bool) {
 	protocol := protocolICMPv4
 	if ipv6Trace {
 		protocol = protocolICMPv6
@@ -325,14 +356,14 @@ func tokenFromEmbeddedPacket(ipv6Trace bool, packet []byte) (uint64, bool) {
 
 	msg, err := icmp.ParseMessage(protocol, packet)
 	if err != nil {
-		return 0, false
+		return icmpToken{}, false
 	}
 
 	if ipv6Trace && msg.Type != ipv6.ICMPTypeEchoRequest {
-		return 0, false
+		return icmpToken{}, false
 	}
 	if !ipv6Trace && msg.Type != ipv4.ICMPTypeEcho {
-		return 0, false
+		return icmpToken{}, false
 	}
 	return tokenFromEcho(msg)
 }
@@ -359,8 +390,38 @@ func stripIPv6Packet(packet []byte) []byte {
 	return packet[ipv6.HeaderLen:]
 }
 
+func (r icmpReply) matches(id ID) bool {
+	if r.hasPayloadToken {
+		return r.payloadToken == id.Token
+	}
+	return r.headerToken == id.HeaderToken
+}
+
+func (r *icmpReply) setToken(token icmpToken) {
+	r.payloadToken = token.payload
+	r.hasPayloadToken = token.hasPayload
+	r.headerToken = token.header
+}
+
+func nextICMPID() (identifier int, sequence int, headerToken uint32, payloadToken uint64) {
+	headerToken = icmpHeaderCounter.Add(1)
+	identifier = int(headerToken >> 16)
+	sequence = int(headerToken & 0xffff)
+
+	payloadToken = icmpPayloadCounter.Add(0x9e3779b97f4a7c15)
+	if payloadToken == 0 {
+		payloadToken = icmpPayloadCounter.Add(0x9e3779b97f4a7c15)
+	}
+
+	return identifier, sequence, headerToken, payloadToken
+}
+
+func makeICMPHeaderToken(identifier int, sequence int) uint32 {
+	return uint32(uint16(identifier))<<16 | uint32(uint16(sequence))
+}
+
 func makeICMPToken(identifier int, sequence int) uint64 {
-	return uint64(uint16(identifier))<<16 | uint64(uint16(sequence))
+	return uint64(makeICMPHeaderToken(identifier, sequence))
 }
 
 func echoData(token uint64, size int) []byte {

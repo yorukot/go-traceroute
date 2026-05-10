@@ -10,19 +10,26 @@ import (
 )
 
 func TestClassifyIPv4EchoReply(t *testing.T) {
-	token := makeICMPToken(1234, 7)
+	token := makeICMPHeaderToken(1234, 7)
+	payloadToken := uint64(0x0102030405060708)
 	msg := &icmp.Message{
 		Type: ipv4.ICMPTypeEchoReply,
 		Code: 0,
-		Body: &icmp.Echo{ID: 1234, Seq: 7},
+		Body: &icmp.Echo{ID: 1234, Seq: 7, Data: echoData(payloadToken, icmpTokenLen)},
 	}
 
 	reply, ok := classifyICMPMessage(false, msg)
 	if !ok {
 		t.Fatal("classifyICMPMessage returned false")
 	}
-	if reply.token != token {
-		t.Fatalf("token = %d, want %d", reply.token, token)
+	if reply.headerToken != token {
+		t.Fatalf("headerToken = %d, want %d", reply.headerToken, token)
+	}
+	if !reply.hasPayloadToken {
+		t.Fatal("missing payload token")
+	}
+	if reply.payloadToken != payloadToken {
+		t.Fatalf("payloadToken = %d, want %d", reply.payloadToken, payloadToken)
 	}
 	if reply.kind != ReplyDestination {
 		t.Fatalf("kind = %q, want %q", reply.kind, ReplyDestination)
@@ -41,11 +48,81 @@ func TestClassifyIPv4TimeExceeded(t *testing.T) {
 	if !ok {
 		t.Fatal("classifyICMPMessage returned false")
 	}
-	if reply.token != makeICMPToken(1234, 8) {
-		t.Fatalf("token = %d, want %d", reply.token, makeICMPToken(1234, 8))
+	if reply.headerToken != makeICMPHeaderToken(1234, 8) {
+		t.Fatalf("headerToken = %d, want %d", reply.headerToken, makeICMPHeaderToken(1234, 8))
 	}
 	if reply.kind != ReplyTimeExceeded {
 		t.Fatalf("kind = %q, want %q", reply.kind, ReplyTimeExceeded)
+	}
+}
+
+func TestICMPReplyPrefersPayloadTokenForMatching(t *testing.T) {
+	reply := icmpReply{
+		payloadToken:    100,
+		hasPayloadToken: true,
+		headerToken:     200,
+	}
+
+	if !reply.matches(ID{Token: 100, HeaderToken: 999}) {
+		t.Fatal("payload token should match even when header token differs")
+	}
+	if reply.matches(ID{Token: 999, HeaderToken: 200}) {
+		t.Fatal("payload token should reject even when header token matches")
+	}
+}
+
+func TestICMPReplyFallsBackToHeaderTokenForMatching(t *testing.T) {
+	reply := icmpReply{
+		headerToken: 200,
+	}
+
+	if !reply.matches(ID{Token: 999, HeaderToken: 200}) {
+		t.Fatal("header token should match when payload token is unavailable")
+	}
+	if reply.matches(ID{Token: 999, HeaderToken: 201}) {
+		t.Fatal("header token should reject a different probe")
+	}
+}
+
+func TestTokenFromEchoUsesPayloadWhenAvailable(t *testing.T) {
+	payloadToken := uint64(0x1122334455667788)
+	msg := &icmp.Message{
+		Type: ipv4.ICMPTypeEchoReply,
+		Code: 0,
+		Body: &icmp.Echo{ID: 1234, Seq: 7, Data: echoData(payloadToken, icmpTokenLen)},
+	}
+
+	token, ok := tokenFromEcho(msg)
+	if !ok {
+		t.Fatal("tokenFromEcho returned false")
+	}
+	if token.header != makeICMPHeaderToken(1234, 7) {
+		t.Fatalf("header = %d, want %d", token.header, makeICMPHeaderToken(1234, 7))
+	}
+	if !token.hasPayload {
+		t.Fatal("missing payload token")
+	}
+	if token.payload != payloadToken {
+		t.Fatalf("payload = %d, want %d", token.payload, payloadToken)
+	}
+}
+
+func TestTokenFromEchoFallsBackToHeaderWithoutPayload(t *testing.T) {
+	msg := &icmp.Message{
+		Type: ipv4.ICMPTypeEchoReply,
+		Code: 0,
+		Body: &icmp.Echo{ID: 1234, Seq: 7},
+	}
+
+	token, ok := tokenFromEcho(msg)
+	if !ok {
+		t.Fatal("tokenFromEcho returned false")
+	}
+	if token.header != makeICMPHeaderToken(1234, 7) {
+		t.Fatalf("header = %d, want %d", token.header, makeICMPHeaderToken(1234, 7))
+	}
+	if token.hasPayload {
+		t.Fatal("unexpected payload token")
 	}
 }
 

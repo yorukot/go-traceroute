@@ -19,9 +19,10 @@ type Options struct {
 
 // ID correlates a sent probe with a reply.
 type ID struct {
-	Token   uint64
-	TTL     int
-	Attempt int
+	Token       uint64
+	HeaderToken uint32
+	TTL         int
+	Attempt     int
 }
 
 // Sent describes a probe after it has been sent.
