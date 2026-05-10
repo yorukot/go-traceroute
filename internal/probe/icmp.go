@@ -29,10 +29,7 @@ const (
 
 var listenICMPPacket = icmp.ListenPacket
 
-var (
-	icmpHeaderCounter  atomic.Uint32
-	icmpPayloadCounter atomic.Uint64
-)
+var icmpHeaderCounter atomic.Uint32
 
 type icmpProber struct {
 	conn *icmp.PacketConn
@@ -71,7 +68,6 @@ func init() {
 
 	value := binary.BigEndian.Uint64(seed[:])
 	icmpHeaderCounter.Store(uint32(value))
-	icmpPayloadCounter.Store(value)
 }
 
 func newICMPProber(ctx context.Context, dst netip.Addr, opts Options) (Prober, error) {
@@ -407,11 +403,7 @@ func nextICMPID() (identifier int, sequence int, headerToken uint32, payloadToke
 	headerToken = icmpHeaderCounter.Add(1)
 	identifier = int(headerToken >> 16)
 	sequence = int(headerToken & 0xffff)
-
-	payloadToken = icmpPayloadCounter.Add(0x9e3779b97f4a7c15)
-	if payloadToken == 0 {
-		payloadToken = icmpPayloadCounter.Add(0x9e3779b97f4a7c15)
-	}
+	payloadToken = makeICMPToken(identifier, sequence)
 
 	return identifier, sequence, headerToken, payloadToken
 }

@@ -126,6 +126,27 @@ func TestTokenFromEchoFallsBackToHeaderWithoutPayload(t *testing.T) {
 	}
 }
 
+func TestNextICMPIDDerivesPayloadFromHeader(t *testing.T) {
+	original := icmpHeaderCounter.Load()
+	icmpHeaderCounter.Store(0x12345677)
+	defer icmpHeaderCounter.Store(original)
+
+	identifier, sequence, headerToken, payloadToken := nextICMPID()
+
+	if identifier != 0x1234 {
+		t.Fatalf("identifier = %#x, want 0x1234", identifier)
+	}
+	if sequence != 0x5678 {
+		t.Fatalf("sequence = %#x, want 0x5678", sequence)
+	}
+	if headerToken != 0x12345678 {
+		t.Fatalf("headerToken = %#x, want 0x12345678", headerToken)
+	}
+	if payloadToken != makeICMPToken(identifier, sequence) {
+		t.Fatalf("payloadToken = %#x, want %#x", payloadToken, makeICMPToken(identifier, sequence))
+	}
+}
+
 func TestClassifyIPv4DestinationFiltered(t *testing.T) {
 	embedded := ipv4EchoPacket(t, 1234, 9)
 	msg := &icmp.Message{
