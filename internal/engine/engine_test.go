@@ -251,7 +251,7 @@ func TestEngineEmitsStreamEventsInOrder(t *testing.T) {
 	}
 
 	kinds := sink.kinds()
-	want := []EventKind{EventProbeSent, EventProbe, EventHop, EventDone}
+	want := []EventKind{EventProbe, EventHop, EventDone}
 	if len(kinds) != len(want) {
 		t.Fatalf("event count = %d, want %d: %v", len(kinds), len(want), kinds)
 	}

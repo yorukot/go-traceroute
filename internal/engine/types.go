@@ -86,23 +86,16 @@ const (
 type EventKind string
 
 const (
-	EventProbeSent EventKind = "probe-sent"
-	EventProbe     EventKind = "probe"
-	EventHop       EventKind = "hop"
-	EventDone      EventKind = "done"
+	EventProbe EventKind = "probe"
+	EventHop   EventKind = "hop"
+	EventDone  EventKind = "done"
 )
 
 type Event struct {
-	Kind     EventKind
-	HopProbe *HopProbe
-	Probe    *Probe
-	Hop      *Hop
-	Trace    *Trace
-}
-
-type HopProbe struct {
-	TTL     int
-	Attempt int
+	Kind  EventKind
+	Probe *Probe
+	Hop   *Hop
+	Trace *Trace
 }
 
 type Sink interface {

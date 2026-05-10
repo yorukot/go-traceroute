@@ -27,8 +27,6 @@ type Options struct {
 	PacketSize int
 
 	ResolveNames bool
-
-	Hooks Hooks
 }
 
 // DefaultOptions returns the package defaults.

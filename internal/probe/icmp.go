@@ -35,7 +35,6 @@ type icmpProber struct {
 	dst  net.Addr
 
 	ipv6       bool
-	protocol   int
 	echoType   icmp.Type
 	packetSize int
 
@@ -67,13 +66,11 @@ func newICMPProber(ctx context.Context, dst netip.Addr, opts Options) (Prober, e
 
 	network := "ip4:icmp"
 	address := "0.0.0.0"
-	protocol := protocolICMPv4
 	echoType := icmp.Type(ipv4.ICMPTypeEcho)
 	ipv6Trace := dst.Is6()
 	if ipv6Trace {
 		network = "ip6:ipv6-icmp"
 		address = "::"
-		protocol = protocolICMPv6
 		echoType = icmp.Type(ipv6.ICMPTypeEchoRequest)
 	}
 
@@ -91,7 +88,6 @@ func newICMPProber(ctx context.Context, dst netip.Addr, opts Options) (Prober, e
 		conn:       conn,
 		dst:        &net.IPAddr{IP: netIPFromAddr(dst)},
 		ipv6:       ipv6Trace,
-		protocol:   protocol,
 		echoType:   echoType,
 		packetSize: packetSize,
 	}, nil
@@ -122,7 +118,7 @@ func (p *icmpProber) Send(ctx context.Context, ttl int, attempt int) (Sent, erro
 		Body: &icmp.Echo{
 			ID:   identifier,
 			Seq:  seq,
-			Data: echoData(p.packetSize - icmpHeaderLen),
+			Data: paddingData(p.packetSize - icmpHeaderLen),
 		},
 	}
 	packet, err := msg.Marshal(nil)
@@ -178,7 +174,7 @@ func (p *icmpProber) Receive(ctx context.Context, sent Sent, timeout time.Durati
 		}
 
 		parsed, ok := parseICMPReply(p.ipv6, buf[:n])
-		if !ok || !parsed.matches(sent.HeaderToken) {
+		if !ok || parsed.headerToken != sent.HeaderToken {
 			continue
 		}
 
@@ -236,8 +232,8 @@ func classifyICMPMessage(ipv6Trace bool, msg *icmp.Message) (icmpReply, bool) {
 func classifyICMPv4Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool) {
 	switch msg.Type {
 	case ipv4.ICMPTypeEchoReply:
-		token, ok := tokenFromEcho(msg)
-		reply.headerToken = token
+		headerToken, ok := headerTokenFromEcho(msg)
+		reply.headerToken = headerToken
 		reply.kind = ReplyDestination
 		return reply, ok
 	case ipv4.ICMPTypeTimeExceeded:
@@ -245,8 +241,8 @@ func classifyICMPv4Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool)
 		if !ok {
 			return icmpReply{}, false
 		}
-		token, ok := tokenFromEmbeddedPacket(false, body.Data)
-		reply.headerToken = token
+		headerToken, ok := headerTokenFromEmbeddedPacket(false, body.Data)
+		reply.headerToken = headerToken
 		reply.kind = ReplyTimeExceeded
 		reply.annotation = ipv4TimeExceededAnnotation(msg.Code)
 		return reply, ok
@@ -255,8 +251,8 @@ func classifyICMPv4Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool)
 		if !ok {
 			return icmpReply{}, false
 		}
-		token, ok := tokenFromEmbeddedPacket(false, body.Data)
-		reply.headerToken = token
+		headerToken, ok := headerTokenFromEmbeddedPacket(false, body.Data)
+		reply.headerToken = headerToken
 		reply.kind = ipv4DestinationUnreachableKind(msg.Code)
 		reply.annotation = ipv4DestinationUnreachableAnnotation(msg.Code)
 		return reply, ok
@@ -268,8 +264,8 @@ func classifyICMPv4Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool)
 func classifyICMPv6Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool) {
 	switch msg.Type {
 	case ipv6.ICMPTypeEchoReply:
-		token, ok := tokenFromEcho(msg)
-		reply.headerToken = token
+		headerToken, ok := headerTokenFromEcho(msg)
+		reply.headerToken = headerToken
 		reply.kind = ReplyDestination
 		return reply, ok
 	case ipv6.ICMPTypeTimeExceeded:
@@ -277,8 +273,8 @@ func classifyICMPv6Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool)
 		if !ok {
 			return icmpReply{}, false
 		}
-		token, ok := tokenFromEmbeddedPacket(true, body.Data)
-		reply.headerToken = token
+		headerToken, ok := headerTokenFromEmbeddedPacket(true, body.Data)
+		reply.headerToken = headerToken
 		reply.kind = ReplyTimeExceeded
 		reply.annotation = ipv6TimeExceededAnnotation(msg.Code)
 		return reply, ok
@@ -287,8 +283,8 @@ func classifyICMPv6Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool)
 		if !ok {
 			return icmpReply{}, false
 		}
-		token, ok := tokenFromEmbeddedPacket(true, body.Data)
-		reply.headerToken = token
+		headerToken, ok := headerTokenFromEmbeddedPacket(true, body.Data)
+		reply.headerToken = headerToken
 		reply.kind = ipv6DestinationUnreachableKind(msg.Code)
 		reply.annotation = ipv6DestinationUnreachableAnnotation(msg.Code)
 		return reply, ok
@@ -297,8 +293,8 @@ func classifyICMPv6Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool)
 		if !ok {
 			return icmpReply{}, false
 		}
-		token, ok := tokenFromEmbeddedPacket(true, body.Data)
-		reply.headerToken = token
+		headerToken, ok := headerTokenFromEmbeddedPacket(true, body.Data)
+		reply.headerToken = headerToken
 		reply.kind = ReplyPacketTooBig
 		reply.annotation = "packet too big"
 		return reply, ok
@@ -307,7 +303,7 @@ func classifyICMPv6Message(reply icmpReply, msg *icmp.Message) (icmpReply, bool)
 	}
 }
 
-func tokenFromEcho(msg *icmp.Message) (uint32, bool) {
+func headerTokenFromEcho(msg *icmp.Message) (uint32, bool) {
 	echo, ok := msg.Body.(*icmp.Echo)
 	if !ok {
 		return 0, false
@@ -315,7 +311,7 @@ func tokenFromEcho(msg *icmp.Message) (uint32, bool) {
 	return makeICMPHeaderToken(echo.ID, echo.Seq), true
 }
 
-func tokenFromEmbeddedPacket(ipv6Trace bool, packet []byte) (uint32, bool) {
+func headerTokenFromEmbeddedPacket(ipv6Trace bool, packet []byte) (uint32, bool) {
 	protocol := protocolICMPv4
 	if ipv6Trace {
 		protocol = protocolICMPv6
@@ -335,7 +331,7 @@ func tokenFromEmbeddedPacket(ipv6Trace bool, packet []byte) (uint32, bool) {
 	if !ipv6Trace && msg.Type != ipv4.ICMPTypeEcho {
 		return 0, false
 	}
-	return tokenFromEcho(msg)
+	return headerTokenFromEcho(msg)
 }
 
 func stripIPv4Packet(packet []byte) []byte {
@@ -360,10 +356,6 @@ func stripIPv6Packet(packet []byte) []byte {
 	return packet[ipv6.HeaderLen:]
 }
 
-func (r icmpReply) matches(headerToken uint32) bool {
-	return r.headerToken == headerToken
-}
-
 func nextICMPID() (identifier int, sequence int, headerToken uint32) {
 	headerToken = icmpHeaderCounter.Add(1)
 	identifier = int(headerToken >> 16)
@@ -376,7 +368,7 @@ func makeICMPHeaderToken(identifier int, sequence int) uint32 {
 	return uint32(uint16(identifier))<<16 | uint32(uint16(sequence))
 }
 
-func echoData(size int) []byte {
+func paddingData(size int) []byte {
 	if size <= 0 {
 		return nil
 	}

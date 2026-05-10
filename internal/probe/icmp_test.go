@@ -14,7 +14,7 @@ func TestClassifyIPv4EchoReply(t *testing.T) {
 	msg := &icmp.Message{
 		Type: ipv4.ICMPTypeEchoReply,
 		Code: 0,
-		Body: &icmp.Echo{ID: 1234, Seq: 7, Data: echoData(8)},
+		Body: &icmp.Echo{ID: 1234, Seq: 7, Data: paddingData(8)},
 	}
 
 	reply, ok := classifyICMPMessage(false, msg)
@@ -49,48 +49,44 @@ func TestClassifyIPv4TimeExceeded(t *testing.T) {
 	}
 }
 
-func TestICMPReplyMatchesHeaderToken(t *testing.T) {
-	reply := icmpReply{
-		headerToken: 200,
-	}
-
-	if !reply.matches(200) {
-		t.Fatal("header token should match")
-	}
-	if reply.matches(201) {
-		t.Fatal("header token should reject a different probe")
-	}
-}
-
-func TestTokenFromEchoUsesHeader(t *testing.T) {
+func TestHeaderTokenFromEchoUsesHeader(t *testing.T) {
 	msg := &icmp.Message{
 		Type: ipv4.ICMPTypeEchoReply,
 		Code: 0,
-		Body: &icmp.Echo{ID: 1234, Seq: 7, Data: echoData(8)},
+		Body: &icmp.Echo{ID: 1234, Seq: 7, Data: paddingData(8)},
 	}
 
-	token, ok := tokenFromEcho(msg)
+	token, ok := headerTokenFromEcho(msg)
 	if !ok {
-		t.Fatal("tokenFromEcho returned false")
+		t.Fatal("headerTokenFromEcho returned false")
 	}
 	if token != makeICMPHeaderToken(1234, 7) {
 		t.Fatalf("token = %d, want %d", token, makeICMPHeaderToken(1234, 7))
 	}
 }
 
-func TestTokenFromEchoUsesHeaderWithoutPayload(t *testing.T) {
+func TestHeaderTokenFromEchoUsesHeaderWithoutPayload(t *testing.T) {
 	msg := &icmp.Message{
 		Type: ipv4.ICMPTypeEchoReply,
 		Code: 0,
 		Body: &icmp.Echo{ID: 1234, Seq: 7},
 	}
 
-	token, ok := tokenFromEcho(msg)
+	token, ok := headerTokenFromEcho(msg)
 	if !ok {
-		t.Fatal("tokenFromEcho returned false")
+		t.Fatal("headerTokenFromEcho returned false")
 	}
 	if token != makeICMPHeaderToken(1234, 7) {
 		t.Fatalf("token = %d, want %d", token, makeICMPHeaderToken(1234, 7))
+	}
+}
+
+func TestPaddingDataUsesRequestedSize(t *testing.T) {
+	if got := len(paddingData(12)); got != 12 {
+		t.Fatalf("len(paddingData(12)) = %d, want 12", got)
+	}
+	if got := paddingData(0); got != nil {
+		t.Fatalf("paddingData(0) = %v, want nil", got)
 	}
 }
 

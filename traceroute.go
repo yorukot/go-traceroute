@@ -69,7 +69,6 @@ func (t *Tracer) newEngine(events chan<- Event) *engine.Engine {
 		probe.NewFactory(),
 		traceSink{
 			events: events,
-			hooks:  t.opts.Hooks,
 		},
 	)
 }
@@ -122,26 +121,15 @@ func (r resolverAdapter) LookupAddr(ctx context.Context, addr netip.Addr) ([]str
 
 type traceSink struct {
 	events chan<- Event
-	hooks  Hooks
 }
 
 func (s traceSink) Emit(event engine.Event) {
 	switch event.Kind {
-	case engine.EventProbeSent:
-		if s.hooks.OnProbeSent != nil && event.HopProbe != nil {
-			s.hooks.OnProbeSent(HopProbe{
-				TTL:     event.HopProbe.TTL,
-				Attempt: event.HopProbe.Attempt,
-			})
-		}
 	case engine.EventProbe:
 		if event.Probe == nil {
 			return
 		}
 		probe := convertProbe(*event.Probe)
-		if s.hooks.OnProbeReceived != nil && probe.Status != StatusTimeout && probe.Status != StatusError {
-			s.hooks.OnProbeReceived(probe)
-		}
 		if s.events != nil {
 			s.events <- Event{Kind: EventProbe, Probe: &probe}
 		}
@@ -150,9 +138,6 @@ func (s traceSink) Emit(event engine.Event) {
 			return
 		}
 		hop := convertHop(*event.Hop)
-		if s.hooks.OnHopComplete != nil {
-			s.hooks.OnHopComplete(hop)
-		}
 		if s.events != nil {
 			s.events <- Event{Kind: EventHop, Hop: &hop}
 		}

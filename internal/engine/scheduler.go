@@ -27,14 +27,6 @@ func (e *Engine) traceHop(ctx context.Context, prober probe.Prober, ttl int) (Ho
 			continue
 		}
 
-		e.emit(Event{
-			Kind: EventProbeSent,
-			HopProbe: &HopProbe{
-				TTL:     ttl,
-				Attempt: attempt,
-			},
-		})
-
 		reply, err := prober.Receive(ctx, sent, e.opts.Timeout)
 		completed := Probe{
 			Attempt: attempt,
@@ -64,7 +56,7 @@ func (e *Engine) traceHop(ctx context.Context, prober probe.Prober, ttl int) (Ho
 }
 
 func probeFromReply(attempt int, sent probe.Sent, reply probe.Reply) Probe {
-	status := StatusOK
+	var status Status
 	switch reply.Kind {
 	case probe.ReplyTimeExceeded:
 		status = StatusOK
