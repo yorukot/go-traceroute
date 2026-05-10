@@ -61,16 +61,3 @@ func (r defaultResolver) LookupAddr(ctx context.Context, addr netip.Addr) ([]str
 	}
 	return names, nil
 }
-
-func addressMatchesVersion(addr netip.Addr, version IPVersion) bool {
-	switch version {
-	case IPAny:
-		return true
-	case IPv4:
-		return addr.Is4()
-	case IPv6:
-		return addr.Is6()
-	default:
-		return false
-	}
-}

@@ -1,4 +1,4 @@
-package engine
+package traceroute
 
 import (
 	"context"
@@ -43,6 +43,7 @@ func testOptions() Options {
 		QueriesPerHop: 1,
 		Timeout:       time.Second,
 		PacketSize:    48,
+		UDPBasePort:   defaultUDPBasePort,
 	}
 }
 
@@ -69,7 +70,7 @@ func TestEngineStopsWhenDestinationReached(t *testing.T) {
 		},
 	})
 
-	eng := New(
+	eng := newTraceEngine(
 		testOptions(),
 		fakeResolver{addrs: []netip.Addr{dst}},
 		testutil.FakeFactory{Prober: prober},
@@ -106,7 +107,7 @@ func TestEngineContinuesAfterTimeout(t *testing.T) {
 		},
 	})
 
-	eng := New(
+	eng := newTraceEngine(
 		testOptions(),
 		fakeResolver{addrs: []netip.Addr{dst}},
 		testutil.FakeFactory{Prober: prober},
@@ -152,7 +153,7 @@ func TestEngineMaxHopsIsPartialTraceNotFatal(t *testing.T) {
 		},
 	})
 
-	eng := New(
+	eng := newTraceEngine(
 		opts,
 		fakeResolver{addrs: []netip.Addr{dst}},
 		testutil.FakeFactory{Prober: prober},
@@ -186,11 +187,11 @@ func TestEngineResolveNamesDoesNotFailTrace(t *testing.T) {
 		},
 	})
 
-	eng := New(
+	eng := newTraceEngine(
 		opts,
 		fakeResolver{
 			addrs: []netip.Addr{dst},
-			names: map[netip.Addr][]string{hopAddr: []string{"router.local"}},
+			names: map[netip.Addr][]string{hopAddr: {"router.local"}},
 		},
 		testutil.FakeFactory{Prober: prober},
 		nil,
@@ -211,7 +212,7 @@ func TestEngineContextCancellation(t *testing.T) {
 
 	dst := netip.MustParseAddr("93.184.216.34")
 	prober := testutil.NewFakeProber(nil)
-	eng := New(
+	eng := newTraceEngine(
 		testOptions(),
 		fakeResolver{addrs: []netip.Addr{dst}},
 		testutil.FakeFactory{Prober: prober},
@@ -239,7 +240,7 @@ func TestEngineEmitsStreamEventsInOrder(t *testing.T) {
 	})
 	var sink collectSink
 
-	eng := New(
+	eng := newTraceEngine(
 		testOptions(),
 		fakeResolver{addrs: []netip.Addr{dst}},
 		testutil.FakeFactory{Prober: prober},

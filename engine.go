@@ -1,4 +1,4 @@
-package engine
+package traceroute
 
 import (
 	"context"
@@ -10,16 +10,25 @@ import (
 	"github.com/yorukot/go-traceroute/internal/probe"
 )
 
-// Engine orchestrates a trace without knowing how probes are implemented.
-type Engine struct {
+// traceEngine orchestrates a trace without knowing how probes are implemented.
+type traceEngine struct {
 	opts    Options
-	res     Resolver
+	res     traceResolver
 	factory probe.Factory
-	sink    Sink
+	sink    eventSink
 }
 
-func New(opts Options, res Resolver, factory probe.Factory, sink Sink) *Engine {
-	return &Engine{
+type traceResolver interface {
+	LookupIP(ctx context.Context, host string, version IPVersion) ([]netip.Addr, error)
+	LookupAddr(ctx context.Context, addr netip.Addr) ([]string, error)
+}
+
+type eventSink interface {
+	Emit(Event)
+}
+
+func newTraceEngine(opts Options, res traceResolver, factory probe.Factory, sink eventSink) *traceEngine {
+	return &traceEngine{
 		opts:    opts,
 		res:     res,
 		factory: factory,
@@ -27,7 +36,7 @@ func New(opts Options, res Resolver, factory probe.Factory, sink Sink) *Engine {
 	}
 }
 
-func (e *Engine) Trace(ctx context.Context, target string) (*Trace, error) {
+func (e *traceEngine) Trace(ctx context.Context, target string) (*Trace, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -84,7 +93,7 @@ func (e *Engine) Trace(ctx context.Context, target string) (*Trace, error) {
 	return trace, nil
 }
 
-func (e *Engine) resolve(ctx context.Context, target string) (netip.Addr, error) {
+func (e *traceEngine) resolve(ctx context.Context, target string) (netip.Addr, error) {
 	if addr, err := netip.ParseAddr(target); err == nil {
 		if addressMatchesVersion(addr, e.opts.IPVersion) {
 			return addr, nil
@@ -109,7 +118,7 @@ func (e *Engine) resolve(ctx context.Context, target string) (netip.Addr, error)
 	return netip.Addr{}, ErrNoAddress
 }
 
-func (e *Engine) probeOptions() probe.Options {
+func (e *traceEngine) probeOptions() probe.Options {
 	return probe.Options{
 		Protocol:      probe.Protocol(e.opts.Protocol),
 		FirstHop:      e.opts.FirstHop,
@@ -119,7 +128,7 @@ func (e *Engine) probeOptions() probe.Options {
 	}
 }
 
-func (e *Engine) emit(event Event) {
+func (e *traceEngine) emit(event Event) {
 	if e.sink != nil {
 		e.sink.Emit(event)
 	}
@@ -133,17 +142,4 @@ func versionOf(addr netip.Addr) IPVersion {
 		return IPv6
 	}
 	return IPAny
-}
-
-func addressMatchesVersion(addr netip.Addr, version IPVersion) bool {
-	switch version {
-	case IPAny:
-		return true
-	case IPv4:
-		return addr.Is4()
-	case IPv6:
-		return addr.Is6()
-	default:
-		return false
-	}
 }

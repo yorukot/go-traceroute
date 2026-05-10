@@ -2,6 +2,7 @@ package traceroute
 
 import (
 	"fmt"
+	"net/netip"
 	"time"
 )
 
@@ -20,9 +21,11 @@ type Protocol int
 const (
 	ProtocolICMP Protocol = iota
 	ProtocolUDP
+	ProtocolTCP
 )
 
 const defaultUDPBasePort = 33434
+const defaultTCPPort = 80
 
 // Options controls trace behavior.
 type Options struct {
@@ -38,6 +41,8 @@ type Options struct {
 	PacketSize  int
 	UDPBasePort int
 
+	TCPPort int
+
 	ResolveNames bool
 }
 
@@ -52,6 +57,7 @@ func DefaultOptions() Options {
 		Timeout:       3 * time.Second,
 		PacketSize:    48,
 		UDPBasePort:   defaultUDPBasePort,
+		TCPPort:       defaultTCPPort,
 		ResolveNames:  false,
 	}
 }
@@ -102,6 +108,9 @@ func (o Options) Validate() error {
 	if o.UDPBasePort < 1 || o.UDPBasePort > 65535 {
 		return fmt.Errorf("traceroute: UDPBasePort must be between 1 and 65535")
 	}
+	if o.TCPPort < 1 || o.TCPPort > 65535 {
+		return fmt.Errorf("traceroute: TCPPort must be between 1 and 65535")
+	}
 
 	switch o.IPVersion {
 	case IPAny, IPv4, IPv6:
@@ -128,4 +137,17 @@ func (o Options) udpPortRangeOverflows() bool {
 	available := int64(65535 - o.UDPBasePort + 1)
 
 	return ttlCount > available/queryCount
+}
+
+func addressMatchesVersion(addr netip.Addr, version IPVersion) bool {
+	switch version {
+	case IPAny:
+		return true
+	case IPv4:
+		return addr.Is4()
+	case IPv6:
+		return addr.Is6()
+	default:
+		return false
+	}
 }

@@ -1,4 +1,4 @@
-package engine
+package traceroute
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/yorukot/go-traceroute/internal/probe"
 )
 
-func (e *Engine) traceHop(ctx context.Context, prober probe.Prober, ttl int) (Hop, error) {
+func (e *traceEngine) traceHop(ctx context.Context, prober probe.Prober, ttl int) (Hop, error) {
 	hop := Hop{TTL: ttl}
 
 	for attempt := 1; attempt <= e.opts.QueriesPerHop; attempt++ {
@@ -91,7 +91,7 @@ func probeFromReply(attempt int, sent probe.Sent, reply probe.Reply) Probe {
 	}
 }
 
-func (e *Engine) lookupHostname(ctx context.Context, addr netip.Addr) string {
+func (e *traceEngine) lookupHostname(ctx context.Context, addr netip.Addr) string {
 	names, err := e.res.LookupAddr(ctx, addr)
 	if err != nil || len(names) == 0 {
 		return ""

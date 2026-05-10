@@ -1,4 +1,4 @@
-package engine
+package traceroute
 
 func reachedDestination(hop Hop) bool {
 	for _, probe := range hop.Probes {
