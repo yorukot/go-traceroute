@@ -1,6 +1,7 @@
 # go-traceroute
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/yorukot/go-traceroute)](https://goreportcard.com/report/github.com/yorukot/go-traceroute)
+[![Go Reference](https://pkg.go.dev/badge/github.com/yorukot/go-traceroute.svg)](https://pkg.go.dev/github.com/yorukot/go-traceroute#section-readme)
 
 `go-traceroute` is a Go library for ICMP and UDP (maybe more in the future) traceroute with structured results.
 
